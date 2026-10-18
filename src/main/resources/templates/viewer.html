@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>3D CAD Workspace</title>
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css">
+    <style>
+        body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; }
+        #sidebar { width: 320px; background: #f8f9fa; padding: 20px; border-right: 1px solid #ddd; }
+        #viewer-container { flex-grow: 1; background: #111; }
+        .comment-box { background: white; padding: 10px; margin-top: 10px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h4>3D Workspace Feedback</h4>
+        <textarea id="commentText" class="form-control w-100 mb-2" placeholder="Type spatial comment..."></textarea>
+        <button onclick="submitSpatialComment()" class="btn btn-primary w-100">Submit Feedback</button>
+        <hr>
+        <h5>Review Markers</h5>
+        <div id="commentsList"></div>
+    </div>
+    <div id="viewer-container"></div>
+
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.min.js"></script>
+    <script th:inline="javascript">
+        const documentId = 'urn:' + [[${urn}]];
+        const token = [[${accessToken}]];
+        const drawingId = [[${drawingId}]];
+        let viewer;
+
+        Autodesk.Viewing.Initializer({ env: 'AutodeskProduction', api: 'derivativeV2', getAccessToken: (cb) => cb(token, 3600) }, () => {
+            viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('viewer-container'));
+            viewer.start();
+            Autodesk.Viewing.Document.load(documentId, (doc) => viewer.loadDocumentNode(doc, doc.getRoot().getDefaultGeometry()), console.error);
+            loadSavedComments();
+        });
+
+        function submitSpatialComment() {
+            const text = document.getElementById('commentText').value;
+            if (!text.trim()) return;
+            fetch('/api/comments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drawingId, commentText: text, cameraState: JSON.stringify(viewer.getState()), dbId: viewer.getSelection()[0] || null })
+            }).then(() => { document.getElementById('commentText').value = ''; loadSavedComments(); });
+        }
+
+        function loadSavedComments() {
+            fetch(`/api/comments/drawing/${drawingId}`).then(res => res.json()).then(comments => {
+                const list = document.getElementById('commentsList');
+                list.innerHTML = '';
+                comments.forEach(c => {
+                    const el = document.createElement('div');
+                    el.className = 'comment-box';
+                    el.innerHTML = `p>${c.commentText}</p><button class="btn btn-sm btn-secondary" onclick='viewer.restoreState(${c.cameraState})'>Inspect Camera</button>`;
+                    list.appendChild(el);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
