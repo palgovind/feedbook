@@ -1,0 +1,53 @@
+# Render Infrastructure-as-Code (IaC) Configuration Blueprint
+services:
+  - type: web
+    name: feedbook-app
+    env: docker
+    plan: free # Can be upgraded to 'starter', 'standard', etc.
+    region: ohio # Options: oregon, ohio, frankfurt, singapore
+    
+    # Render builds the project using the root Dockerfile automatically
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+
+    # Inject runtime environments matching your Spring application configuration properties
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://${FEEDBOOK_DB_HOST}:${FEEDBOOK_DB_PORT}/${FEEDBOOK_DB_NAME}
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: feedbook-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: feedbook-db
+          property: password
+      - key: FEEDBOOK_DB_HOST
+        fromDatabase:
+          name: feedbook-db
+          property: host
+      - key: FEEDBOOK_DB_PORT
+        fromDatabase:
+          name: feedbook-db
+          property: port
+      - key: FEEDBOOK_DB_NAME
+        fromDatabase:
+          name: feedbook-db
+          property: database
+          
+      # PLACEHOLDERS: Add your secret Autodesk APS API keys directly in the Render Web Dashboard 
+      # under Environment Variables instead of committing raw values to GitHub!
+      - key: AUTODESK_APS_CLIENT_ID
+        sync: false
+      - key: AUTODESK_APS_CLIENT_SECRET
+        sync: false
+
+# Database Orchestration Framework Layer
+databases:
+  - name: feedbook-db
+    plan: free
+    region: ohio
+    databaseName: feedbook
+    user: feedbook_admin
